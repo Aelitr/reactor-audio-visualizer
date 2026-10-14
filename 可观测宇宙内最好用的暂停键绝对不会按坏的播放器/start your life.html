@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#121614">
+<title>REACTOR — 声场反应堆</title>
+<meta name="description" content="让音乐驱动堆芯。实时音频可视化系统。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23121614'/%3E%3Cpath d='M7 23V15h4v8m3 0V6h4v17m3 0V11h4v12' stroke='%23dded84' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="crt-theme">
+<!-- 全屏高斯模糊拖入蒙版 -->
+<div id="drop-overlay">
+  <div class="drop-message">插入中</div>
+</div>
+
+<header>
+  <a class="brand" href="./"><span id="brand-icon-container" class="brand-icon">▦</span> REACTOR<span class="edition">AUDIO LAB / 01</span></a>
+  <button id="theme-switch-btn" class="theme-switch-btn crt" title="切换显示风格">我们原本的未来</button>
+  <button id="fullscreen" class="plain">全屏 ↗</button>
+</header>
+<main>
+  <section class="stage">
+    <div class="stage-title">
+      <div>
+        <div class="eyebrow">REAL-TIME AUDIO VISUALIZER</div>
+        <h1>声场反应堆<span> / CORE 01</span></h1>
+      </div>
+      <div class="scale">
+        <span>功率</span>
+        <span>低</span>
+        <div></div>
+        <span>高</span>
+      </div>
+    </div>
+
+    <!-- 数字功率计与独立停止/满载锁定大按钮 -->
+    <div class="power-hud" id="power-hud">
+      <span class="eyebrow">REACTOR OUTPUT / 堆芯功率</span>
+      <div class="power-display"><span id="power-num">666</span><small>MW</small></div>
+      <button id="machine-btn" class="machine-circle-btn" title="堆芯总闸: 停止并满载锁定">A3-5</button>
+    </div>
+
+    <!-- 独立动态歌词监视窗口 -->
+    <div class="reactor-window lyrics-window embedded" id="lyrics-window">
+      <div class="rw-header" id="lw-header">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="eyebrow">LYRICS / 动态歌词监视</span>
+          <button id="import-lyric-btn" class="rw-min" title="导入歌词文件">＋ 导入</button>
+        </div>
+        <div class="rw-controls">
+          <span id="lyric-filename" class="subtle" style="font-size:10px;margin-right:4px;"></span>
+          <button class="rw-min" id="lyrics-embed" title="嵌入/取消嵌入">▣</button>
+          <button class="rw-min" id="lyrics-min" title="最小化">_</button>
+          <button class="rw-min" id="lyrics-close" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="rw-body lyrics-body">
+        <div id="lyrics-container" class="lyrics-scroll-container">
+          <div class="rw-empty lyrics-prompt-empty">待导入</div>
+        </div>
+      </div>
+    </div>
+    <input id="lyric-file" type="file" accept=".lrc,.txt" multiple hidden>
+
+    <!-- 独立辐射剂量监视窗口（伦琴表窗口） -->
+    <div class="reactor-window roentgen-window embedded" id="roentgen-window">
+      <div class="rw-header" id="rw-header-roentgen">
+        <span class="eyebrow">RADIATION / 辐射剂量监视</span>
+        <div class="rw-controls">
+          <button class="rw-min" id="roentgen-embed" title="嵌入/取消嵌入">▣</button>
+          <button class="rw-min" id="roentgen-min" title="最小化">_</button>
+          <button class="rw-min" id="roentgen-close" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="rw-body">
+        <div class="roentgen-content">
+          <div class="roentgen-display-row">
+            <span id="roentgen-num" class="roentgen-value">0.1</span>
+            <small class="roentgen-unit">伦琴R</small>
+          </div>
+          <div class="roentgen-bar-container">
+            <div id="roentgen-bar-fill" class="roentgen-bar-fill"></div>
+          </div>
+        </div>
+        <div class="crt-overlay"></div>
+        <div class="crt-scanline"></div>
+      </div>
+    </div>
+
+    <!-- 独立函数发生器窗口 -->
+    <div class="reactor-window generator-window embedded" id="generator-window" style="display:none;">
+      <div class="rw-header" id="rw-header-generator">
+        <span class="eyebrow">GENERATOR / 函数发生器</span>
+        <div class="rw-controls">
+          <button class="rw-min" id="generator-embed" title="嵌入/取消嵌入">▣</button>
+          <button class="rw-min" id="generator-min" title="最小化">_</button>
+          <button class="rw-min" id="generator-close" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="rw-body">
+        <div class="generator-content">
+          <div class="generator-display-row">
+            <input id="gen-freq-input" type="number" min="10" max="24000" value="440" class="generator-input" aria-label="函数发生器频率输入">
+            <small class="generator-unit">Hz</small>
+          </div>
+          <input id="gen-freq-slider" type="range" min="10" max="24000" value="440" step="1" aria-label="函数发生器频率调节滑块">
+        </div>
+        <div class="crt-overlay"></div>
+        <div class="crt-scanline"></div>
+      </div>
+    </div>
+
+    <!-- 模拟示波器独立窗口 -->
+    <div class="reactor-window oscilloscope-window embedded" id="oscilloscope-window" style="display:none;">
+      <div class="rw-header" id="rw-header-oscilloscope">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span class="eyebrow">OSCILLOSCOPE / 模拟示波器</span>
+        </div>
+        <div class="rw-controls">
+          <select id="osc-style-select" class="rw-select" title="切换示波器风格">
+            <option value="vector-music">X-Y 音频矢量作画 (Oscilloscope Music)</option>
+            <option value="text-vector">文本矢量作画 (Text Vector)</option>
+            <option value="lissajous">李萨如图形 (Lissajous)</option>
+            <option value="3d">3D 几何图像</option>
+            <option value="2d">2D 坐标波形</option>
+          </select>
+          <button class="rw-min" id="oscilloscope-embed" title="嵌入/取消嵌入">▣</button>
+          <button class="rw-min" id="oscilloscope-min" title="最小化">_</button>
+          <button class="rw-min" id="oscilloscope-close" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="osc-toolbar">
+        <label id="osc-text-label">文本: <input id="osc-text-input" type="text" value="REACTOR" title="输入示波器绘制文字" style="width:72px; background:var(--bg); color:var(--accent); border:1px solid var(--line); padding:2px 4px; font-family:monospace; font-size:10px;"></label>
+        <div id="lissajous-controls" style="display:none; align-items:center; gap:6px;">
+          <label>X频: <input id="lissajous-fx" type="number" min="1" max="10" value="1" style="width:36px; background:var(--bg); color:var(--accent); border:1px solid var(--line); padding:2px; font-family:monospace; font-size:10px;"></label>
+          <label>Y频: <input id="lissajous-fy" type="number" min="1" max="10" value="2" style="width:36px; background:var(--bg); color:var(--accent); border:1px solid var(--line); padding:2px; font-family:monospace; font-size:10px;"></label>
+          <label>相位: <input id="lissajous-phase" type="range" min="0" max="6.28" value="1.57" step="0.1" title="相位差" style="width:50px;"></label>
+        </div>
+        <label>AM: <input id="am-slider" type="range" min="0" max="1" value="0.2" step="0.05" title="调幅深度"></label>
+        <label>速度: <input id="osc-speed-slider" type="range" min="0.1" max="3" value="1.0" step="0.1" title="3D图像动态速度"></label>
+        <label>FM: <input id="fm-slider" type="range" min="0" max="2" value="0.5" step="0.1" title="调频深度"></label>
+        <label>缩放: <input id="osc-zoom-slider" type="range" min="0.05" max="25.0" value="1.0" step="0.05" title="矢量作画与2D波形窗口宽范围缩放"></label>
+        <label><input id="osc-invert-x" type="checkbox" title="X轴水平反转"> X反转</label>
+        <label><input id="osc-invert-y" type="checkbox" title="Y轴垂直反转"> Y反转</label>
+        <label><input id="osc-hold-freeze" type="checkbox" checked title="暂停时保留当前画面"> 画面保持</label>
+      </div>
+      <div class="rw-body">
+        <canvas id="oscilloscope-canvas" aria-label="模拟示波器实时渲染"></canvas>
+        <div class="crt-overlay"></div>
+        <div class="crt-scanline"></div>
+      </div>
+    </div>
+
+    <!-- 反应堆监控终端风格封面窗口 -->
+    <div class="reactor-window" id="cover-window">
+      <div class="rw-header" id="rw-header">
+        <span class="eyebrow">MONITOR / 核心图控</span>
+        <div class="rw-controls">
+          <span id="rw-status" class="subtle">待机</span>
+          <button class="rw-min" id="cover-embed" title="嵌入/取消嵌入">⧉</button>
+          <button class="rw-min" id="cover-min" title="最小化">_</button>
+          <button class="rw-min" id="cover-close" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="rw-body">
+        <img id="cover-img" src="" alt="Album Cover" style="display:none;">
+        <div id="cover-empty" class="rw-empty">
+          <span class="crt-blank-text">无图像</span>
+          <canvas id="dot-aperture-canvas" style="display:none;"></canvas>
+        </div>
+        <div class="crt-overlay"></div>
+        <div class="crt-scanline"></div>
+      </div>
+    </div>
+
+    <!-- 反应堆频谱监控窗口 -->
+    <div class="reactor-window spectrum-window embedded" id="spectrum-window">
+      <div class="rw-header" id="sw-header">
+        <span class="eyebrow">SPECTRUM / 频谱监视</span>
+        <div class="rw-controls">
+          <select id="spectrum-style" class="rw-select" title="切换显示风格">
+            <option value="bars">柱状图</option>
+            <option value="wave">动态波形</option>
+          </select>
+          <button class="rw-min" id="spectrum-embed" title="嵌入/取消嵌入">▣</button>
+          <button class="rw-min" id="spectrum-min" title="最小化">_</button>
+        </div>
+      </div>
+      <div class="rw-body">
+        <canvas id="track-spectrum" aria-label="音频实时频谱监视"></canvas>
+        <div id="spectrum-empty" class="rw-empty"></div>
+        <div class="crt-overlay"></div>
+        <div class="crt-scanline"></div>
+      </div>
+    </div>
+
+    <!-- 独立“我喜欢的歌曲”窗口 -->
+    <div class="reactor-window favorites-window embedded" id="favorites-window" style="display:none;">
+      <div class="rw-header" id="rw-header-favorites">
+        <span class="eyebrow">FAVORITES / 我喜欢的歌曲</span>
+        <div class="rw-controls">
+          <button class="rw-min" id="favorites-embed" title="嵌入/取消嵌入">▣</button>
+          <button class="rw-min" id="favorites-min" title="最小化">_</button>
+          <button class="rw-min" id="favorites-close" title="关闭">×</button>
+        </div>
+      </div>
+      <div class="rw-body" style="flex-direction:column; align-items:stretch; padding:10px; overflow-y:auto;">
+        <ul id="favorites-list" class="playlist" style="max-height:180px;"></ul>
+        <div id="favorites-empty" class="rw-empty">暂无喜欢的歌曲，可将列表曲目拖入或点击爱心添加</div>
+        <div class="crt-overlay"></div>
+        <div class="crt-scanline"></div>
+      </div>
+    </div>
+
+    <div class="live"><i></i><span id="status">待机 · 演示预览</span></div>
+    <canvas id="core" aria-label="圆形控制棒阵列，随音频频谱起伏的三维可视化"></canvas>
+    <div class="axis top">CORE 01</div>
+    <div class="stage-bottom">
+      <span>↔ 拖动旋转视角 <span class="desktop"> / 滚轮缩放</span></span>
+      <button id="reset" class="plain">重置视角 ⤾</button>
+    </div>
+  </section>
+
+  <aside>
+    <div class="panel-title">
+      <span>控制台</span>
+      <span class="eyebrow">CONTROL PANEL</span>
+    </div>
+    <section class="source">
+      <label class="caption">01 / 音频输入</label>
+      <div class="source-tabs">
+        <button id="oscilloscope-tab-btn">模拟示波器</button>
+        <button id="generator-btn">函数发生器</button>
+        <button id="system-audio">捕获系统音频</button>
+      </div>
+      <button id="upload" class="upload">
+        <span>＋</span>
+        <strong>导入音频文件</strong>
+        <small>MP3 / WAV / M4A / FLAC · 支持多选</small>
+      </button>
+      <input id="file" type="file" accept="audio/*" multiple hidden>
+      
+      <div class="track" id="track-container">
+        <span class="track-icon">≋</span>
+        <div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0;">
+          <button id="prev-track" class="track-ctrl-btn" aria-label="上一曲">⏮</button>
+          <button id="play" aria-label="播放">▶</button>
+          <button id="next-track" class="track-ctrl-btn" aria-label="下一曲">⏭</button>
+          <div style="flex:1; min-width:0; margin-left:4px;">
+            <strong id="trackname">OSCILLOSCOPE / 模拟示波器</strong>
+            <small id="tracksub"></small>
+          </div>
+        </div>
+      </div>
+      
+      <div class="timeline" id="timeline-container">
+        <input id="seek" aria-label="播放进度" type="range" min="0" max="100" value="0" step="0.1">
+        <div>
+          <span id="elapsed">00:00</span>
+          <span id="duration"></span>
+        </div>
+      </div>
+
+      <div id="system-status-banner" class="system-status-banner">
+        外部输入中
+      </div>
+      
+      <div class="playlist-head">
+        <span class="subtle">播放列表</span>
+        <button id="shuffle-btn" class="plain" style="font-size:16px;padding:2px 8px;border:1px solid var(--line);margin:0 auto;line-height:1;" title="随机播放: 关">⤮</button>
+        <button id="favorites-open-btn" class="plain" style="font-size:16px;padding:2px 8px;border:1px solid var(--line);margin:0 auto;line-height:1;" title="我喜欢的歌曲">♡</button>
+        <span class="subtle" id="playlist-count">0 首</span>
+      </div>
+      <input type="text" id="playlist-search" class="playlist-search" placeholder="搜索曲目..." aria-label="搜索播放列表">
+      <ul id="playlist" class="playlist"></ul>
+      <p id="playlist-empty" class="playlist-empty">还没有音频，点击上方「导入音频文件」添加，或将文件拖入窗口中。</p>
+      
+      <div class="playlist-tools">
+        <label class="switch"><input id="autonext" type="checkbox" checked> 自动下一首</label>
+        <button id="playlist-clear" class="plain">清空列表</button>
+      </div>
+      <div class="playlist-tools" style="margin-top: 12px; gap: 8px;">
+        <button id="toggle-cover-btn" class="styled-3d-btn">显示/隐藏封面</button>
+        <button id="toggle-lyrics-btn" class="styled-3d-btn">显示/隐藏歌词</button>
+      </div>
+    </section>
+
+    <!-- 02 / 控制棒响应面板 -->
+    <section id="response-section">
+      <div id="response-header" class="caption-header" style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;">
+        <label class="caption" style="margin:0;">02 / 响应调节</label>
+        <span id="response-toggle-indicator" class="subtle" style="font-size:11px;">[展开 ▾]</span>
+      </div>
+      
+      <div id="response-body">
+        <div class="slider-title"><label for="gain">灵敏度</label><output id="gainval">1.4×</output></div>
+        <input id="gain" type="range" min="0.3" max="3" value="1.4" step="0.1">
+        <div class="slider-title"><label for="smooth">运动平滑度</label><output id="smoothval">75%</output></div>
+        <input id="smooth" type="range" min="0" max="95" value="75">
+        
+        <div class="slider-title"><label for="osc-response">示波器动态响应度</label><output id="osc-response-val">1.0×</output></div>
+        <input id="osc-response" type="range" min="0.2" max="3.0" value="1.0" step="0.1">
+
+        <div class="slider-title"><label for="roentgen-gain">伦琴计量表灵敏度</label><output id="roentgen-gain-val">1.0×</output></div>
+        <input id="roentgen-gain" type="range" min="0.3" max="2.5" value="1.0" step="0.1">
+        <div class="slider-title"><label for="power-gain">功率计灵敏度</label><output id="power-gain-val">1.0×</output></div>
+        <input id="power-gain" type="range" min="0.3" max="2.5" value="1.0" step="0.1">
+
+        <div class="slider-title"><label for="volume">播放音量</label><output id="volumeval">40%</output></div>
+        <input id="volume" type="range" min="0" max="100" value="40">
+
+        <div class="slider-title"><label for="lyric-size">歌词字号大小</label><output id="lyric-size-val">16px</output></div>
+        <input id="lyric-size" type="range" min="12" max="28" value="16" step="1">
+        <div class="slider-title"><label for="power-size">功率计字号大小</label><output id="power-size-val">64px</output></div>
+        <input id="power-size" type="range" min="14" max="64" value="64" step="1">
+        <div class="slider-title"><label for="lyrics-opacity">歌词窗口透明度</label><output id="lyrics-opacity-val">85%</output></div>
+        <input id="lyrics-opacity" type="range" min="20" max="100" value="85">
+        <div class="slider-title"><label for="window-opacity">封面窗口透明度</label><output id="window-opacity-val">85%</output></div>
+        <input id="window-opacity" type="range" min="20" max="100" value="85">
+        <div class="slider-title"><label for="spectrum-opacity">频谱窗口透明度</label><output id="spectrum-opacity-val">85%</output></div>
+        <input id="spectrum-opacity" type="range" min="20" max="100" value="85">
+
+        <div class="slider-title"><span>频段分布</span><span class="subtle">中心 → 边缘</span></div>
+        <div class="legend">
+          <span><i class="low"></i>低频</span>
+          <span><i class="mid"></i>中频</span>
+          <span><i class="high"></i>高频</span>
+        </div>
+      </div>
+
+      <div id="response-compact" class="response-compact" style="display:none;">
+        <div class="compact-row">
+          <span>灵敏度: <strong id="compact-gain">1.4×</strong></span>
+          <span>平滑度: <strong id="compact-smooth">75%</strong></span>
+          <span>音量: <strong id="compact-vol">40%</strong></span>
+        </div>
+        <button id="expand-quick-btn" class="expand-quick-btn">展开完整调节面板</button>
+      </div>
+    </section>
+
+    <section class="readings">
+      <label class="caption">03 / 实时读数</label>
+      <div class="meters">
+        <div><span>输入电平</span><strong id="level">—<small>dB</small></strong></div>
+        <div><span>峰值频率</span><strong id="freq">—<small>Hz</small></strong></div>
+      </div>
+      <canvas id="spectrum" aria-label="实时频谱"></canvas>
+    </section>
+    
+    <p id="message" role="status">音频仅在本机处理，不会上传。</p>
+  </aside>
+</main>
+
+<footer>
+  <span><b>◈</b> REACTOR EXPERIMENT</span>
+  <span>音乐驱动 · 非真实反应堆模拟</span>
+  <span>WEB AUDIO / LIVE</span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
